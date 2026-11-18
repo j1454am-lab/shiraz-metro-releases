@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "package_name": "ir.sjsalimi.shirazmetro",
+  "version_code": 13,
+  "version_name": "1.0.12",
+  "notes_fa": "نسخه آزمایشی ۱.۰.۱۲ فقط برای سنجش بروزرسانی؛ داده‌های خدمات اطراف برخی ایستگاه‌ها هنوز تأیید نشده‌اند.",
+  "sha256": "01f450c3c20ab85c3c7ac825c27e2d391b3f81bd8628587a5ef31365cbc85032",
+  "apk_url": "https://github.com/j1454am-lab/shiraz-metro-releases/releases/download/v1.0.12/shiraz-metro-1.0.12-signed.apk"
+}
