@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "package_name": "ir.sjsalimi.shirazmetro",
-  "version_code": 17,
-  "version_name": "1.0.16",
-  "notes_fa": "نسخه آزمایشی ۱.۰.۱۶: حذف فیلتر نشان‌شده‌ها از صفحه خانه؛ نشان‌شده‌ها در منوی پایین محفوظ است. داده‌های خدمات اطراف برخی ایستگاه‌ها هنوز تأیید نشده‌اند.",
-  "sha256": "bb0b760e5317439b3453ee3fe61450585e146d8701db37b5d03b2cd3219ad50e",
-  "apk_url": "https://github.com/j1454am-lab/shiraz-metro-releases/releases/download/v1.0.16/shiraz-metro-1.0.16-signed.apk"
+  "version_code": 19,
+  "version_name": "1.0.18",
+  "notes_fa": "نسخه آزمایشی ۱.۰.۱۸ برای آزمون بروزرسانی درون‌برنامه‌ای از نسخه ۱.۰.۱۷؛ رابط کاربری و اطلاعات ایستگاه‌ها بدون تغییر. برخی اطلاعات خدمات اطراف ایستگاه‌ها هنوز تأیید نشده‌اند.",
+  "sha256": "23852497d91e94d963a55e8b0519d3c7fe6fb9c66474570cf54f885990943472",
+  "apk_url": "https://github.com/j1454am-lab/shiraz-metro-releases/releases/download/v1.0.18/shiraz-metro-1.0.18-signed.apk"
 }
