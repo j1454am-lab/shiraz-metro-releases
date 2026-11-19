@@ -1,0 +1,58 @@
+name: Public OTA manifest validation
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths: ['latest.json', 'scripts/verify_ota.py', '.github/workflows/manifest-check.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  manifest-gate:
+    name: Manifest gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install APK verification tools
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n1)"
+          fi
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" "build-tools;35.0.0" >/dev/null
+      - name: Validate update manifest and public APK
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          previous=()
+          verifier=scripts/verify_ota.py
+          if [[ "$EVENT" = pull_request ]]; then
+            git show "$BASE:latest.json" > "$work/previous.json"
+            if ! cmp -s "$work/previous.json" latest.json; then
+              test "$(git diff --name-only "$BASE" HEAD)" = latest.json
+              git show "$BASE:scripts/verify_ota.py" > "$work/trusted_verifier.py"
+              verifier="$work/trusted_verifier.py"
+              previous=(--previous "$work/previous.json")
+            fi
+          fi
+          # Construct the download URL only from a strict version name.
+          version="$(python3 -c 'import json,re; v=json.load(open("latest.json"))["version_name"]; assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+",v); print(v)')"
+          root="https://github.com/j1454am-lab/shiraz-metro-releases/releases/download"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 60 --max-filesize 52428800 "$root/v1.0.18/shiraz-metro-1.0.18-signed.apk" -o "$work/anchor.apk"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 60 --max-filesize 52428800 "$root/v$version/shiraz-metro-$version-signed.apk" -o "$work/candidate.apk"
+          python3 "$verifier" --manifest latest.json --apk "$work/candidate.apk" --anchor "$work/anchor.apk" --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" "${previous[@]}"
+          echo "Public APK and manifest verified. No writes performed." >> "$GITHUB_STEP_SUMMARY"

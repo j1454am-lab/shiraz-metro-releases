@@ -1,0 +1,110 @@
+name: Public OTA — admit signed candidate
+on:
+  repository_dispatch:
+    types: [metro-signed-candidate-v1]
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: public-ota-admission
+  cancel-in-progress: false
+jobs:
+  admit:
+    if: ${{ github.repository == 'j1454am-lab/shiraz-metro-releases' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.client_payload.tag }}
+      REPO: j1454am-lab/shiraz-metro-releases
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Validate handoff and require protected public main
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          test "$(gh api "repos/$REPO/branches/main" --jq .protected)" = true
+          version="${TAG#v}"
+          branch="activate/$TAG"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "::error::Activation branch already exists; reconcile existing release, do not overwrite."
+            exit 1
+          fi
+          gh release view "$TAG" --repo "$REPO" --json tagName,isDraft,isPrerelease,assets > "$RUNNER_TEMP/draft.json"
+          jq -e --arg tag "$TAG" --arg apk "shiraz-metro-$version-signed.apk" '
+            .tagName == $tag and .isDraft and .isPrerelease and
+            (([.assets[].name]|sort) == ([$apk,"SHA256SUMS.txt","candidate.json"]|sort))
+          ' "$RUNNER_TEMP/draft.json" >/dev/null
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install APK verification tools
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n1)"
+          fi
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" "build-tools;35.0.0" >/dev/null
+      - name: Download draft and independently check signature and metadata
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          mkdir "$RUNNER_TEMP/candidate"
+          gh release download "$TAG" --repo "$REPO" --dir "$RUNNER_TEMP/candidate" \
+            --pattern "shiraz-metro-$version-signed.apk" --pattern SHA256SUMS.txt --pattern candidate.json
+          root="https://github.com/$REPO/releases/download"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 60 --max-filesize 52428800 "$root/v1.0.18/shiraz-metro-1.0.18-signed.apk" -o "$RUNNER_TEMP/anchor.apk"
+          git fetch origin main
+          git show origin/main:latest.json > "$RUNNER_TEMP/previous.json"
+          test "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version_name"])' "$RUNNER_TEMP/candidate/candidate.json")" = "$version"
+          python3 scripts/verify_ota.py --manifest "$RUNNER_TEMP/candidate/candidate.json" \
+            --apk "$RUNNER_TEMP/candidate/shiraz-metro-$version-signed.apk" --sums "$RUNNER_TEMP/candidate/SHA256SUMS.txt" \
+            --anchor "$RUNNER_TEMP/anchor.apk" --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
+            --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" --previous "$RUNNER_TEMP/previous.json"
+      - name: Publish admitted APK (technical pre-release only)
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$REPO/branches/main" --jq .protected)" = true
+          gh release edit "$TAG" --repo "$REPO" --draft=false --prerelease
+      - name: Check publicly downloadable bytes without authentication
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          url="https://github.com/$REPO/releases/download/$TAG/shiraz-metro-$version-signed.apk"
+          for i in 1 2 3 4 5; do
+            if curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 60 --max-filesize 52428800 "$url" -o "$RUNNER_TEMP/public.apk" &&
+              cmp -s "$RUNNER_TEMP/public.apk" "$RUNNER_TEMP/candidate/shiraz-metro-$version-signed.apk"; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Public asset mismatch; feed will not be activated."
+          exit 1
+      - name: Prepare protected manifest activation pull request
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          git fetch origin main
+          git checkout -b "activate/$TAG" origin/main
+          python3 scripts/verify_ota.py --manifest "$RUNNER_TEMP/candidate/candidate.json" \
+            --apk "$RUNNER_TEMP/public.apk" --sums "$RUNNER_TEMP/candidate/SHA256SUMS.txt" \
+            --anchor "$RUNNER_TEMP/anchor.apk" --apksigner "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
+            --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" --previous latest.json
+          cp "$RUNNER_TEMP/candidate/candidate.json" latest.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add latest.json
+          git commit -m "release: activate Metro $TAG"
+          git push origin "activate/$TAG"
+          if ! gh pr create --repo "$REPO" --base main --head "activate/$TAG" \
+            --title "Activate Metro $TAG OTA" --body "Public gate verified APK checksum, package, version, signing certificate and public bytes. Review and merge only after Manifest gate passes; latest.json is activated by merge, not by this workflow."; then
+            echo "::warning::Automatic PR creation unavailable. Owner must open activation PR from the compare link."
+          fi
+          echo "Signed public APK admitted; latest.json NOT changed by this workflow." >> "$GITHUB_STEP_SUMMARY"
+          echo "Activation review: https://github.com/$REPO/compare/main...activate/$TAG?expand=1" >> "$GITHUB_STEP_SUMMARY"
