@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "package_name": "ir.sjsalimi.shirazmetro",
-  "version_code": 21,
-  "version_name": "1.0.20",
-  "notes_fa": "نسخه آزمایشی کنترل کیفیت؛ بهبود اعتبارسنجی فایل بروزرسانی، مدیریت خطاهای شبکه و دانلود، لغو دریافت و اعلان‌ها. بدون تغییر اطلاعات ایستگاه‌ها و مسیریابی. | آزمایشی؛ برخی اطلاعات خدمات اطراف ایستگاه‌ها هنوز تأیید نشده‌اند.",
-  "sha256": "bb98d6d57fec61bad58adccf0567548404a509f03c552b2fe655034e0bebf737",
-  "apk_url": "https://github.com/j1454am-lab/shiraz-metro-releases/releases/download/v1.0.20/shiraz-metro-1.0.20-signed.apk"
+  "version_code": 22,
+  "version_name": "1.0.21",
+  "notes_fa": "نسخه آزمایشی برای آزمون واقعی مکانیزم بروزرسانی اصلاح‌شده نسخه ۱.۰.۲۰؛ بدون تغییر کارکرد، رابط کاربری یا اطلاعات ایستگاه‌ها. | آزمایشی؛ برخی اطلاعات خدمات اطراف ایستگاه‌ها هنوز تأیید نشده‌اند.",
+  "sha256": "d70cd0971506194d9009d189cfc03dac33d768fee7fb90b83fa01785fe4fb194",
+  "apk_url": "https://github.com/j1454am-lab/shiraz-metro-releases/releases/download/v1.0.21/shiraz-metro-1.0.21-signed.apk"
 }
