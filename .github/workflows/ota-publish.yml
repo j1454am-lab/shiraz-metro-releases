@@ -38,8 +38,19 @@ jobs:
             .tagName == $tag and .isDraft and .isPrerelease and
             (([.assets[].name]|sort) == ([$apk,"SHA256SUMS.txt","candidate.json"]|sort))
           ' "$RUNNER_TEMP/draft.json" >/dev/null
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - name: Install APK verification tools
-        run: sdkmanager "build-tools;35.0.0" >/dev/null
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n1)"
+          fi
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" "build-tools;35.0.0" >/dev/null
       - name: Download draft and independently check signature and metadata
         run: |
           set -euo pipefail
